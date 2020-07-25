@@ -38,7 +38,8 @@ class ConsumerCoordinator(BaseCoordinator):
         'retry_backoff_ms': 100,
         'api_version': (0, 10, 1),
         'exclude_internal_topics': True,
-        'metric_group_prefix': 'consumer'
+        'metric_group_prefix': 'consumer',
+        'coordinator_not_ready_retry_timeout_ms': None
     }
 
     def __init__(self, client, subscription, metrics, **configs):
@@ -76,6 +77,10 @@ class ConsumerCoordinator(BaseCoordinator):
                 (such as offsets) should be exposed to the consumer. If set to
                 True the only way to receive records from an internal topic is
                 subscribing to it. Requires 0.10+. Default: True
+            coordinator_not_ready_retry_timeout_ms (int): The timeout used to
+                detect that the Kafka coordinator is not available. If 'None',
+                the default behavior of polling indefinitely would be kept.
+                Default: None.
         """
         super(ConsumerCoordinator, self).__init__(client, metrics, **configs)
 
