@@ -1,12 +1,9 @@
-from __future__ import absolute_import
-
 from collections import defaultdict
 import copy
 import logging
 import socket
 
 from . import ConfigResourceType
-from kafka.vendor import six
 
 from kafka.admin.acl_resource import ACLOperation, ACLPermissionType, ACLFilter, ACL, ResourcePattern, ResourceType, \
     ACLResourcePatternType
@@ -20,7 +17,7 @@ from kafka.metrics import MetricConfig, Metrics
 from kafka.protocol.admin import (
     CreateTopicsRequest, DeleteTopicsRequest, DescribeConfigsRequest, AlterConfigsRequest, CreatePartitionsRequest,
     ListGroupsRequest, DescribeGroupsRequest, DescribeAclsRequest, CreateAclsRequest, DeleteAclsRequest,
-    DeleteGroupsRequest
+    DeleteGroupsRequest, DescribeLogDirsRequest
 )
 from kafka.protocol.commit import GroupCoordinatorRequest, OffsetFetchRequest
 from kafka.protocol.metadata import MetadataRequest
@@ -32,7 +29,7 @@ from kafka.version import __version__
 log = logging.getLogger(__name__)
 
 
-class KafkaAdminClient(object):
+class KafkaAdminClient:
     """A class for administering the Kafka cluster.
 
     Warning:
@@ -194,7 +191,7 @@ class KafkaAdminClient(object):
         log.debug("Starting KafkaAdminClient with configuration: %s", configs)
         extra_configs = set(configs).difference(self.DEFAULT_CONFIG)
         if extra_configs:
-            raise KafkaConfigurationError("Unrecognized configs: {}".format(extra_configs))
+            raise KafkaConfigurationError(f"Unrecognized configs: {extra_configs}")
 
         self.config = copy.copy(self.DEFAULT_CONFIG)
         self.config.update(configs)
@@ -506,6 +503,8 @@ class KafkaAdminClient(object):
                 topics=topics,
                 allow_auto_topic_creation=auto_topic_creation
             )
+        else:
+            raise IncompatibleBrokerVersion(f"MetadataRequest for {version} is not supported")
 
         future = self._send_request_to_node(
             self._client.least_loaded_node(),
@@ -874,7 +873,7 @@ class KafkaAdminClient(object):
                 ))
         else:
             raise NotImplementedError(
-                "Support for DescribeConfigs v{} has not yet been added to KafkaAdminClient.".format(version))
+                f"Support for DescribeConfigs v{version} has not yet been added to KafkaAdminClient.")
 
         self._wait_for_futures(futures)
         return [f.value for f in futures]
@@ -1013,6 +1012,7 @@ class KafkaAdminClient(object):
     def _describe_consumer_groups_process_response(self, response):
         """Process a DescribeGroupsResponse into a group description."""
         if response.API_VERSION <= 3:
+            group_description = None
             assert len(response.groups) == 1
             for response_field, response_name in zip(response.SCHEMA.fields, response.SCHEMA.names):
                 if isinstance(response_field, Array):
@@ -1048,6 +1048,8 @@ class KafkaAdminClient(object):
                     if response.API_VERSION <=2:
                         described_group_information_list.append(None)
                     group_description = GroupInformation._make(described_group_information_list)
+            if group_description is None:
+                raise Errors.BrokerResponseError("No group description received")
             error_code = group_description.error_code
             error_type = Errors.for_code(error_code)
             # Java has the note: KAFKA-6789, we can retry based on the error code
@@ -1197,7 +1199,7 @@ class KafkaAdminClient(object):
                 topics_partitions_dict = defaultdict(set)
                 for topic, partition in partitions:
                     topics_partitions_dict[topic].add(partition)
-                topics_partitions = list(six.iteritems(topics_partitions_dict))
+                topics_partitions = list(topics_partitions_dict.items())
             request = OffsetFetchRequest[version](group_id, topics_partitions)
         else:
             raise NotImplementedError(
@@ -1345,3 +1347,19 @@ class KafkaAdminClient(object):
 
                 if future.failed():
                     raise future.exception  # pylint: disable-msg=raising-bad-type
+
+    def describe_log_dirs(self):
+        """Send a DescribeLogDirsRequest request to a broker.
+
+        :return: A message future
+        """
+        version = self._matching_api_version(DescribeLogDirsRequest)
+        if version <= 1:
+            request = DescribeLogDirsRequest[version]()
+            future = self._send_request_to_node(self._client.least_loaded_node(), request)
+            self._wait_for_futures([future])
+        else:
+            raise NotImplementedError(
+                "Support for DescribeLogDirsRequest_v{} has not yet been added to KafkaAdminClient."
+                    .format(version))
+        return future.value
