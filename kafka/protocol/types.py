@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import struct
 from struct import error
+import uuid
 
 from kafka.protocol.abstract import AbstractType
 
@@ -88,6 +89,18 @@ class Float64(AbstractType):
     @classmethod
     def decode(cls, data):
         return _unpack(cls._unpack, data.read(8))
+
+
+class UUID(AbstractType):
+    @classmethod
+    def encode(cls, value):
+        if isinstance(value, uuid.UUID):
+            return value.bytes
+        return uuid.UUID(value).bytes
+
+    @classmethod
+    def decode(cls, data):
+        return uuid.UUID(bytes=data.read(16))
 
 
 class String(AbstractType):
@@ -348,7 +361,6 @@ class CompactBytes(AbstractType):
 
 
 class CompactArray(Array):
-
     def encode(self, items):
         if items is None:
             return UnsignedVarInt32.encode(0)
@@ -362,4 +374,3 @@ class CompactArray(Array):
         if length == -1:
             return None
         return [self.array_of.decode(data) for _ in range(length)]
-
