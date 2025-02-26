@@ -6,7 +6,7 @@ current: 7 / 2.1 baseline!
 kafka/producer/sender.py:        version = self._client.api_version(ProduceRequest, max_version=7)
 
 Fetch (1):
-current: 4
+current: 6
 2.1 => 10
 3.0 => 12
 3.9 => 17
