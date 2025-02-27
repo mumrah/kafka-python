@@ -1,3 +1,5 @@
+# Discussion here: https://issues.apache.org/jira/browse/KAFKA-18648
+
 Produce (0):
 current: 7 / 2.1 baseline!
 2.1 => 7
@@ -13,6 +15,9 @@ current: 6
 kafka/consumer/fetcher.py:        version = self._client.api_version(FetchRequest, max_version=4)
 # Requires KIP-227, incremental fetches
 # Requires KIP-320, leader epoch handling / fencing
+#  -> minimal, just send -1 epoch (java clients did this in 2.1 and 2.2)
+#  -> detect log truncation KAFKA-7747 (enabled in v9, recommended for v11 per https://github.com/tulios/kafkajs/issues/1464)
+# v10 is zstandard compression
 
 ListOffsets (2):
 current: 3
@@ -98,3 +103,4 @@ current: not implemented
 2.1 => 0
 3.0 => 1
 3.9 => 2
+see https://cwiki.apache.org/confluence/display/KAFKA/KIP-152+-+Improve+diagnostics+for+SASL+authentication+failures
